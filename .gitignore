@@ -1,5 +1,5 @@
-.txt
-.pdf
+*.txt
+*.pdf
 datasets/
 models/
 submissions/
