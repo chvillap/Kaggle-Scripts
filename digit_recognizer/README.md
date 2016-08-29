@@ -8,4 +8,4 @@ In total, three classification algorithms were tried:
 - k-Nearest Neighbors (kNN);
 - 4-layer Convolutional Neural Network (CNN).
 
-The SVM classifier provided the best result on this competition's test set, achieving an accuracy of **98.457%**.
+The CNN classifier provided the best result on this competition's test set, achieving an accuracy of **98.457%**.
