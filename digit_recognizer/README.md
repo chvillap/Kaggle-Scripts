@@ -8,4 +8,4 @@ In total, three learning algorithms were tried:
 - Support Vector Machines (SVM) with radial basis function kernel;
 - 4-layer Convolutional Neural Network (CNN).
 
-The CNN classifier achieved the best result in the test set, with a classification accuracy of **0.98457 (top 26%)**.
+The CNN classifier achieved the best result in the test set, with a classification accuracy of **0.98457 (top 26% in the leaderboard)**.
