@@ -1,7 +1,7 @@
 # =============================================================================
 # training.py
 #
-# Script for training convolutional neural networks for regression.
+# Script to train convolutional neural networks for regression.
 # =============================================================================
 
 

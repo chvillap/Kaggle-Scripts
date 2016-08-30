@@ -1,7 +1,7 @@
 # =============================================================================
 # test.py
 #
-# Script for testing some pretrained model on unseen data.
+# Script to test some pretrained model on unseen data.
 # =============================================================================
 
 

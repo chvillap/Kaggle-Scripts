@@ -1,7 +1,7 @@
 # =============================================================================
 # visualization.py
 # 
-# Script for visualizing data samples as images.
+# Script to visualize data samples as images.
 # =============================================================================
 
 

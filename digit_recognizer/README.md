@@ -2,10 +2,10 @@
 
 Scripts for the "Digit Recognizer" competition at [Kaggle](https://www.kaggle.com/c/digit-recognizer).
 
-In total, three classification algorithms were tried:
+In total, three learning algorithms were tried:
 
-- Support Vector Machines (SVM) with radial basis function kernel;
 - k-Nearest Neighbors (kNN);
+- Support Vector Machines (SVM) with radial basis function kernel;
 - 4-layer Convolutional Neural Network (CNN).
 
-The CNN classifier provided the best result on this competition's test set, achieving an accuracy of **98.457%**.
+The CNN classifier achieved the best result in the test set, with a classification accuracy of **0.98457 (top 26%)**.
