@@ -132,19 +132,19 @@ def train(X, y):
 
     layers = [
         (InputLayer, {'shape': (None, X.shape[1], X.shape[2], X.shape[3])}),
-        (Conv2DLayer, {'num_filters': 32, 'filter_size': 5}),
-        (Conv2DLayer, {'num_filters': 32, 'filter_size': 3}),
+        (Conv2DLayer, {'num_filters': 32, 'filter_size': 3, pad='same'}),
+        (Conv2DLayer, {'num_filters': 32, 'filter_size': 3, pad='same'}),
         (MaxPool2DLayer, {'pool_size': 2}),
-        (Conv2DLayer, {'num_filters': 64, 'filter_size': 5}),
-        (Conv2DLayer, {'num_filters': 64, 'filter_size': 3}),
+        (Conv2DLayer, {'num_filters': 64, 'filter_size': 3, pad='same'}),
+        (Conv2DLayer, {'num_filters': 64, 'filter_size': 3, pad='same'}),
         (MaxPool2DLayer, {'pool_size': 2}),
-        (Conv2DLayer, {'num_filters': 128, 'filter_size': 5}),
-        (Conv2DLayer, {'num_filters': 128, 'filter_size': 3}),
+        (Conv2DLayer, {'num_filters': 128, 'filter_size': 5, pad='same'}),
+        (Conv2DLayer, {'num_filters': 128, 'filter_size': 3, pad='same'}),
         (MaxPool2DLayer, {'pool_size': 2}),
         (DropoutLayer, {'p': 0.5}),
-        (DenseLayer, {'num_units': 256}),
+        (DenseLayer, {'num_units': 512}),
         (DropoutLayer, {'p': 0.5}),
-        (DenseLayer, {'num_units': 256}),
+        (DenseLayer, {'num_units': 512}),
         (DenseLayer, {'num_units': y.shape[1], 'nonlinearity': None}),
     ]
     model = NeuralNet(
