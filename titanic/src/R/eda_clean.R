@@ -12,7 +12,7 @@ library(RColorBrewer)
 
 # -----------------------------------------------------------------------------
 
-df <- read.csv("../datasets/train.csv")
+df <- read.csv("datasets/train.csv")
 
 # Basic info (sizes, names, types, missing values, some stats).
 str(df)
@@ -108,7 +108,7 @@ fnames <- c("train", "test")
 
 for (f in fnames) {
     # Blanks are now treated as missing values too.
-    df <- read.csv(sprintf("../datasets/%s.csv", f), na.strings = c(""))
+    df <- read.csv(sprintf("datasets/%s.csv", f), na.strings = c(""))
 
     # Create a new Title variable.
     # The title is extracted from the passenger's name.
