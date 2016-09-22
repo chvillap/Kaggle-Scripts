@@ -57,9 +57,9 @@ CLF_SETTINGS = {
 }
 
 
-class AdjustVariable(object):
-    """Responsible for adjusting the parameters of a neural network model at
-    the end of each epoch, iterating over some range of predefined values.
+class AdjustParameter(object):
+    """Adjusts the value of some parameter of the network at the end of each
+    epoch, in order to make it vary over a range of predefined values.
     """
     def __init__(self, name, start, stop):
         self.name = name
@@ -77,8 +77,8 @@ class AdjustVariable(object):
 
 
 class EarlyStopping(object):
-    """Responsible for stopping early the learning process if the model spends
-    too many epochs without any improvement.
+    """Stops the learning process early if the model spends too many epochs
+    without any performance improvement.
     """
     def __init__(self, patience):
         self.patience = patience
@@ -164,8 +164,8 @@ def train(X, y):
         # y_tensor_type=None,
         # use_label_encoder=False,
         on_epoch_finished=[
-            AdjustVariable('update_learning_rate', start=0.01, stop=0.00001),
-            AdjustVariable('update_momentum', start=0.9, stop=0.999),
+            AdjustParameter('update_learning_rate', start=0.01, stop=0.00001),
+            AdjustParameter('update_momentum', start=0.9, stop=0.999),
             EarlyStopping(patience=100),
         ],
         # on_training_started=None,
