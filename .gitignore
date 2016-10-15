@@ -4,3 +4,4 @@ datasets/
 models/
 submissions/
 ignore/
+.ipynb_checkpoints/
