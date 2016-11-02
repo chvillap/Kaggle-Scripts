@@ -7,6 +7,7 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from copy import deepcopy
 from sklearn.metrics import make_scorer
 
 np.random.seed(42)
@@ -14,6 +15,13 @@ np.random.seed(42)
 
 def rmsle(y, y_pred):
     """Computes the root mean squared logarithmic error (RMSLE) metric.
+    
+    Inputs:
+        y       Actual target values.
+        y_pred  Predicted target values.
+    
+    Outputs:
+        RMSLE value.
     """
     msle = np.sum((np.log1p(y) - np.log1p(y_pred))**2) / np.prod(y_pred.shape)
     return np.sqrt(msle)
@@ -24,6 +32,20 @@ def plot_learning_curves(estimators, title, X, y, ylim=None, cv=None,
                          train_sizes=np.linspace(0.1, 1, 5), n_jobs=-1):
     """Plots training and validation errors for increasingly bigger portions of
     the data set, showing the learning progress.
+    
+    Inputs:
+        estimators    List of models to evaluate.
+        title         Graph title.
+        X             Training/validation samples (independent variables).
+        y             Training/validation targets (dependent variables).
+        ylim          Limits of the displayed y values in the graph.
+        cv            Cross-validation object or number of folds.
+        scoring       Scoring function that evaluates the models.
+        train_sizes   Portions of the training set used in the evaluations.
+        n_jobs        Number of jobs (threads).
+    
+    Outputs:
+        None
     """
     from sklearn.model_selection import learning_curve
 
@@ -49,6 +71,9 @@ def plot_learning_curves(estimators, title, X, y, ylim=None, cv=None,
         sns.plt.fill_between(train_sizes, valid_scores_mean - valid_scores_std,
             valid_scores_mean + valid_scores_std, alpha=0.1, color=palette[i])
 
+    if ylim is not None:
+        sns.plt.ylim(*ylim)
+
     sns.plt.grid('on')
     sns.plt.legend(loc='best')
     sns.plt.show()
@@ -56,6 +81,14 @@ def plot_learning_curves(estimators, title, X, y, ylim=None, cv=None,
 
 def select_features(X, y, feature_names=None):
     """Uses a LASSO regression model to select the most relevant features.
+    
+    Inputs:
+        X  Training samples (independent variables).
+        y  Training labels (dependent variable).
+    
+    Outputs:
+        X_sel     Training samples with a lower number of features.
+        selector  Selector object.
     """
     from sklearn.feature_selection import SelectFromModel
     from sklearn.linear_model import LassoCV
@@ -73,7 +106,15 @@ def select_features(X, y, feature_names=None):
 
 
 def train_lasso(X, y):
-    """Trains a tuned LASSO regression model.
+    """Trains a tuned LASSO regression model using grid search and 10-fold
+    cross-validation.
+    
+    Inputs:
+        X  Training samples (independent variables).
+        y  Training targets (dependent variables).
+    
+    Outputs:
+        Tuned LASSO model.
     """
     from sklearn.linear_model import Lasso
     from sklearn.model_selection import GridSearchCV
@@ -96,7 +137,15 @@ def train_lasso(X, y):
 
 
 def train_xgboost(X, y):
-    """Trains a tuned XGBoost regression model.
+    """Trains a tuned XGBoost regression model using grid search and 10-fold
+    cross-validation.
+    
+    Inputs:
+        X  Training samples (independent variables).
+        y  Training targets (dependent variables).
+    
+    Outputs:
+        Tuned XGBoost regression model.
     """
     from xgboost import XGBRegressor
     from sklearn.model_selection import GridSearchCV
@@ -258,8 +307,9 @@ if __name__ == '__main__':
         lasso = train_lasso(X_train_sel, y_train)
         xgb = train_xgboost(X_train_sel, y_train)
 
-        plot_learning_curves([lasso, xgb], 'Learning Curves',
-                             X_train_sel, y_train, cv=5, n_jobs=-1)
+        plot_learning_curves([deepcopy(lasso), deepcopy(xgb)],
+                             'Learning Curves', X_train_sel, y_train,
+                             ylim=(-0.05, 0), cv=5, n_jobs=-1)
 
         y_test_lasso = np.expm1(lasso.predict(X_test_sel))
         y_test_xgb = np.expm1(xgb.predict(X_test_sel))
@@ -271,6 +321,6 @@ if __name__ == '__main__':
                   'SalePrice_xgb': y_test_xgb},
             index=df_test.index,
         )
-        df_submission[['SalePrice']].to_csv(sys.argv[3])
-
         print(df_submission.head(10))
+
+        df_submission[['SalePrice']].to_csv(sys.argv[3])
