@@ -1,0 +1,396 @@
+---
+title: "Titanic - Preprocessing"
+output: html_notebook
+---
+
+Here I describe my approach in exploring and cleaning the data sets for the "Titanic" competition at [Kaggle](https://www.kaggle.com/c/titanic).
+
+## Checking the data
+
+```{r}
+suppressMessages(library(dplyr))
+suppressMessages(library(randomForest))
+suppressMessages(library(ggplot2))
+suppressMessages(library(lattice))
+suppressMessages(library(RColorBrewer))
+```
+
+```{r}
+# Load data from a CSV file.
+df <- read.csv('../datasets/train.csv')
+```
+
+```{r}
+# Show the features and their values.
+str(df)
+```
+
+```{r}
+# Show some statistics for each feature.
+summary(df)
+```
+```{r}
+# Show the first 5 samples.
+head(df)
+```
+
+```{r}
+# Show the last 5 samples
+tail(df)
+```
+
+The training data set contains 891 samples with 11 input features each. There are categorical and numerical variables among them. Our goal is to learn to predict the target variable `Survived`, whose value is 1 for passengers that survived Titanic and 0 for the deceased. Thus, this is a binary classification problem.
+
+```{r}
+# Count missing, blank and unique values.
+df.cnt <- data.frame(
+    na.cnt     = sapply(df, function(x) {sum(is.na(x))}),
+    blank.cnt  = sapply(df, function(x) {sum(!is.na(x) & x == "")}),
+    unique.cnt = sapply(df, function(x) {length(unique(x))}))
+df.cnt <- df.cnt %>%
+          mutate(na.perc     = round(100 * na.cnt / nrow(df), 2),
+                 blank.perc  = round(100 * blank.cnt / nrow(df), 2),
+                 unique.perc = round(100 * unique.cnt / nrow(df), 2))
+rownames(df.cnt) <- colnames(df)
+df.cnt <- df.cnt[, c(1, 4, 2, 5, 3, 6)]
+df.cnt
+```
+
+Some problems can be immediately identified in this data set:
+
+- `Survived` should be a factor (categorical variable).
+- `Age` contains 177 (~19.87%) missing values.
+- `Ticket` contains 681 (~76.43%) unique values.
+- `Cabin` contains 687 (~77.10%) blank values and 148 (~16.61%) unique values.
+- `Embarked` contains 2 (~0.45%) blank values.
+
+`PassengerId` is an ID variable, so it must be ignored by any predictive model.
+
+The other features are ok.
+
+## Data exploration/wrangling
+
+Some auxiliary functions to plot data:
+
+```{r}
+plot.bar <- function(data, x, fill) {
+    ggplot(data, aes_string(x = x, fill = fill)) +
+        scale_fill_brewer(palette = "Paired") +
+        geom_bar() +
+        geom_text(aes(label = ..count..),
+                  stat = "count",
+                  vjust = -0.5,
+                  position = "identity")
+}
+```
+
+```{r}
+plot.stacked.bar <- function(data, x, fill, val.pos, val.neg) {
+    ggplot(data, aes_string(x = x, fill = fill)) +
+        scale_fill_brewer(palette = "Paired") +
+        geom_bar(data = subset(data, Survived == val.pos)) +
+        geom_bar(data = subset(data, Survived == val.neg),
+                 aes(y = -1 * ..count..)) +
+        geom_text(data = subset(data, Survived == val.pos),
+                  aes(label = ..count..),
+                  stat = "count",
+                  vjust = -0.5) +
+        geom_text(data = subset(data, Survived == val.neg),
+                  aes(y = -1 * ..count.., label = ..count..),
+                  stat = "count",
+                  vjust = 1.5) +
+        guides(fill = guide_legend(reverse = TRUE))
+}
+```
+
+```{r}
+plot.histogram <- function(data, x, fill, bins = 10) {
+    ggplot(data, aes_string(x = x, fill = fill)) +
+        scale_fill_brewer(palette = "Paired") +
+        geom_histogram(bins = bins) +
+        facet_grid(reformulate(".", fill))
+}
+```
+
+```{r}
+plot.box.violin <- function(data, x, y, fill, violin = TRUE) {
+    if (violin) {
+        ggplot(data, aes_string(x = x, y = y, fill = fill)) +
+            scale_fill_brewer(palette = "Paired") +
+            geom_violin() +
+            geom_boxplot(width = 0.1, outlier.stroke = NA) +
+            stat_summary(fun.y = "mean", geom = "point", shape = 1)
+    } else {
+        ggplot(data, aes_string(x = x, y = y, fill = fill)) +
+            scale_fill_brewer(palette = "Paired") +
+            geom_boxplot(outlier.shape = 4) +
+            stat_summary(fun.y = "mean", geom = "point", shape = 1)
+    }
+}
+```
+
+The training data set is loaded again. This time, blank strings are considered missing values too.
+
+```{r}
+# Read the training data set again.
+# Blanks are now treated as missing values too.
+df <- read.csv("../datasets/train.csv", na.strings = c(""))
+```
+
+### New feature: `Title`
+
+All passengers have honorific titles associated to their names, indicating their social/marriage status and more. This is possibly a useful information. So the titles of all passengers are extracted from their names, creating a new feature.
+
+```{r}
+title.pattern <- ",\\s([[:alnum:]]+)."
+df <- mutate(df, Title = regmatches(Name, gregexpr(title.pattern, Name)))
+df$Title <- substr(df$Title, 3, nchar(df$Title) - 1)
+```
+
+Some titles appear very rarely and don't need to be represented individually. A separate value is created just to designate these rare titles.
+
+```{r}
+table(df$Title)
+```
+
+```{r}
+df$Title <- sapply(df$Title, function (x) {
+    ifelse(x %in% c("Dr", "Master", "Miss", "Mr", "Mrs", "Rev"), x, "rare")
+})
+table(df$Title)
+```
+
+```{r}
+str(df$Title)
+```
+
+```{r}
+summary(df$Title)
+```
+
+### New feature: `CabinDeck`
+
+The `Cabin` feature has too many distinct values, and this can be bad for the performance of the predictive model. Thus, the original cabin values are replaced by the cabin deck letter, and the result is stored into a new feature.
+
+```{r}
+# Create a new CabinDeck variable from Cabin.
+# The cabin deck is the first letter of the cabin name.
+df <- mutate(df, CabinDeck = substr(Cabin, 1, 1))
+table(df$CabinDeck)
+```
+
+```{r}
+str(df$CabinDeck)
+```
+
+```{r}
+summary(df$CabinDeck)
+```
+
+### Plotting some graphics
+
+```{r}
+# Treat the target variable as categorical.
+df$Survived <- as.factor(df$Survived)
+```
+
+```{r}
+# Plot the distribution of survivors and deceased.
+plot.bar(df, "Survived", "Survived")
+```
+
+```{r}
+# Plot the distributions of ages relative to survivors/deceased.
+plot.box.violin(df, "Survived", "Age", "Survived")
+```
+
+```{r}
+# Plot the distributions of fares relative to survivors/deceased.
+plot.box.violin(df, "Survived", "Fare", "Survived")
+```
+
+```{r}
+# Plot the distributions of siblings and spouses relative to survivors/deceased.
+plot.histogram(df, "SibSp", "Survived")
+```
+
+```{r}
+# Plot the distributions of parents and children relative to survivors/deceased.
+plot.histogram(df, "Parch", "Survived")
+```
+
+```{r}
+# Plot the distributions of classes relative to survivors/deceased.
+plot.stacked.bar(df, "Pclass", "Survived", 1, 0)
+```
+
+```{r}
+# Plot the distributions of genders relative to survivors/deceased.
+plot.stacked.bar(df, "Sex", "Survived", 1, 0)
+```
+
+```{r}
+# Plot the distributions of embarkation ports relative to survivors/deceased.
+plot.stacked.bar(df, "Embarked", "Survived", 1, 0)
+```
+
+```{r}
+# Plot the distribution of titles relative to survivors/deceased, age and sex.
+plot.stacked.bar(df, "Title", "Survived", 1, 0)
+plot.box.violin(df, "Title", "Age", "Sex", violin = FALSE)
+```
+
+```{r}
+# Plot the distributions of cabin decks relative to survivors/deceased.
+plot.stacked.bar(df, "CabinDeck", "Survived", 1, 0)
+```
+
+
+### Filling missing values
+
+It is easy to see that some `Title` values are highly correlated to `Sex` and `Age` (since we have titles that are specific for men, women and children). So the missing `Age` values are filled with the median relative to `Title`.
+
+```{r}
+# Fill missing Age values.
+for (title in unique(df$Title)) {
+    df[is.na(df$Age) & df$Title == title, "Age"] <-
+        median(df[!is.na(df$Age) & df$Title == title, "Age"])
+}
+```
+
+Missing values in `Embarked` are filled with the mode (most frequent existing value).
+
+```{r}
+# Fill missing Embarked values.
+md <- which.max(table(df$Embarked))
+df[is.na(df$Embarked), "Embarked"] <- names(md)
+```
+
+For `Fare`, the missing values are filled with the median relative to `Pclass`.
+
+```{r}
+# Fill missing Fare values.
+pclass <- df[is.na(df$Fare), "Pclass"]
+df[is.na(df$Fare), "Fare"] <-
+    median(df[!is.na(df$Fare) & df$Pclass == pclass, "Fare"])
+```
+
+Most (~77.10%) `CabinDeck` values are actually missing, so it's hard to try to estimate them. Instead, we fill them with a distinct value (called "U"). Moreover, `CabinDeck` has, in principle, 8 levels in the training set, but only 7 in the test set. As there's only 1 observation with this extra value ("T"), it is going to be replaced by "U" too.
+
+```{r}
+# Fill missing CabinDeck values.
+df$CabinDeck[is.na(df$CabinDeck)] <- "U"
+df[df$CabinDeck == "T", "CabinDeck"] <- "U"
+```
+
+### New feature: `StageOfLife`
+
+Now that `Age` has no missing values anymore, we can define a new feature which states the "stage of life" (child, teen, adult or elder) of a passenger.
+
+```{r}
+# It could be represented as an ordered factor as well.
+df$StageOfLife <- ifelse(df$Age < 12, 1,
+                         ifelse(df$Age < 21, 2,
+                                ifelse(df$Age < 50, 3, 4)))
+```
+
+### Additional feature engineering
+
+New features can be specially engineered to try to increase the discriminative power of certain combinations of variables. Some combinations are tried below.
+
+```{r}
+# New combined features.
+df <- mutate(df, SexPol = ifelse(df$Sex == "female", -1, 1))
+df <- mutate(df, Relatives = SibSp + Parch)
+df <- mutate(df, "SexPol_mul_Age" = SexPol * Age)
+df <- mutate(df, "SexPol_mul_Pclass" = SexPol * Pclass)
+df <- mutate(df, "Age_mul_Pclass2" = Age * Pclass^2)
+df <- mutate(df, "root_Fare_div_Pclass" = sqrt(Fare) / Pclass)
+```
+
+```{r}
+str(df)
+```
+
+```{r}
+summary(df)
+```
+
+```{r}
+plot.stacked.bar(df, "StageOfLife", "Survived", 1, 0)
+```
+
+```{r}
+plot.box.violin(df, "Survived", "SexPol_mul_Age", "Survived")
+```
+
+```{r}
+plot.box.violin(df, "Survived", "Age_mul_Pclass2", "Survived")
+```
+
+```{r}
+plot.box.violin(df, "Survived", "root_Fare_div_Pclass", "Survived")
+```
+
+```{r}
+plot.histogram(df, "Relatives", "Survived")
+```
+
+```{r}
+plot.stacked.bar(df, "SexPol_mul_Pclass", "Survived", 1, 0)
+```
+
+### Feature correlation map
+
+```{r}
+as.numeric.factor <- function(x) {as.numeric(levels(x))[x]}
+```
+
+
+```{r}
+# Drop categorical variables.
+df.num <- subset(df, select = -c(PassengerId, Name, Sex, Ticket, Cabin,
+                                 Embarked, Title, CabinDeck))
+```
+
+```{r}
+df.num$Survived <- as.numeric.factor(df.num$Survived)
+```
+
+```{r}
+# Plot the correlation map between all numerical variables.
+brewer.div <- colorRampPalette(brewer.pal(11, "RdBu"))#, interpolate = "spline")
+print(levelplot(cor(df.num),
+                cuts = 100,
+                col.regions = brewer.div,
+                scales = list(x = list(rot = 90))))
+```
+
+### Dropping unnecessary features
+
+Three different versions of the output data set were generated: one with both original/new and combined features, one with the original/new features only, and a third one with the combined features only.
+
+```{r}
+df.sub <- list(
+    subset(df, select = -c(Name, Ticket, Cabin, Sex)),
+    subset(df, select = -c(Name, Ticket, Cabin, Sex,
+                           Pclass, Sex, Age, SibSp, Parch, Fare)),
+    subset(df, select = -c(Name, Ticket, Cabin, Sex,
+                           Relatives, SexPol_mul_Age, SexPol_mul_Pclass,
+                           Age_mul_Pclass2, root_Fare_div_Pclass)),
+    subset(df, select = -c(Name, Ticket, Cabin, Sex, Age, SibSp, Parch,
+                           SexPol_mul_Age, SexPol_mul_Pclass,
+                           Age_mul_Pclass2, root_Fare_div_Pclass)))
+```
+
+Finally, the results are saved.
+
+```{r}
+# Write the cleaned data sets.
+for (k in 1:length(df.sub)) {
+    fname <- sprintf("train%d.csv", k)
+    write.csv(df.sub[[k]], fname, quote = FALSE, row.names = FALSE)
+}
+```
+
+It won't be shown here, but the same process described above was done in the test data set too.

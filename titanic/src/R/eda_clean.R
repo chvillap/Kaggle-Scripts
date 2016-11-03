@@ -116,8 +116,8 @@ for (f in fnames) {
     df <- mutate(df, Title = regmatches(Name, gregexpr(title.pattern, Name)))
     df$Title <- substr(df$Title, 3, nchar(df$Title) - 1)
 
-    # By counting how many times each Title value appear, we see that some
-    # are so rare we can unify them as a single value.
+    # By counting how many times each Title value appear, we can see that some
+    # are so rare that we should unify them into a single value.
     print(table(df$Title))
     df$Title <- sapply(df$Title, function (x) {
         ifelse(x %in% c("Dr", "Master", "Miss", "Mr", "Mrs", "Rev"), x, "rare")
@@ -239,7 +239,7 @@ for (f in fnames) {
 
     # Drop unnecessary variables.
     # Three different versions are tried: one with both original and combined
-    # features, another with the original features only, and a third with the
+    # features, one with the original features only, and a third one with the
     # combined features only.
     df.sub <- list(
         subset(df, select = -c(Name, Ticket, Cabin, Sex)),
@@ -273,7 +273,7 @@ for (f in fnames) {
 
     # -------------------------------------------------------------------------
 
-    # Write the clean data sets.
+    # Write the cleaned data sets.
     for (k in 1:length(df.sub)) {
         fname <- sprintf("%s%d.csv", f, k)
         write.csv(df.sub[[k]], fname, quote = FALSE, row.names = FALSE)
